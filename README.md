@@ -31,7 +31,7 @@ npm install
 npm run dev
 ```
 
-Open the Vite URL printed in the frontend terminal. The frontend proxies API requests to the backend at `http://localhost:3000`. Configure `AUTH_TOKEN` in `backend/.env` if you want to protect API routes; enter the same token in the frontend when prompted.
+Open the Vite URL printed in the frontend terminal. The frontend proxy reads `PORT` from `backend/.env` (falling back to port `3000`); override it with `VITE_BACKEND_PORT` if needed. Configure `AUTH_TOKEN` in `backend/.env` if you want to protect API routes; enter the same token in the frontend when prompted.
 
 See [`backend/README.md`](backend/README.md) and [`frontend/README.md`](frontend/README.md) for API details, CV upload, matching configuration, and workflows.
 

@@ -29,6 +29,13 @@
       "when": 1794342142229,
       "tag": "0003_perpetual_shard",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1794640799412,
+      "tag": "0004_lean_vivisector",
+      "breakpoints": true
     }
   ]
 }

@@ -1,11 +1,12 @@
 import type { FastifyBaseLogger } from 'fastify';
 import { ingestJobs } from './ingest.js';
 import { JobSearchMalawiSource } from './sources/job-search-malawi.js';
+import { malawiPortalSources } from './sources/malawi-portals.js';
 
 const intervalMs = 4 * 60 * 60 * 1000;
 
 export function startJobCollection(logger: FastifyBaseLogger): () => void {
-  const sources = [new JobSearchMalawiSource()];
+  const sources = [new JobSearchMalawiSource(), ...malawiPortalSources];
   let running = false;
 
   const collect = async () => {

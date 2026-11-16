@@ -18,7 +18,8 @@ The API is available on `http://localhost:3000`; `GET /health` is public. Set `A
 ## Workflow endpoints
 
 - `GET /jobs?limit=25&offset=0&minScore=70` — browse and filter collected listings.
-- `POST /jobs/:id/score` — score locally using skills, preferred locations, and seniority where present; no AI service or API key is used. Saving a profile rescales existing jobs; each collection run scores newly collected jobs.
+- `POST /jobs/:id/score` — score using the configured matching mode. Hybrid mode combines semantic similarity with skills, preferred locations, and seniority where present. Saving a profile rescales existing jobs; each collection run scores newly collected jobs.
+- `PUT /jobs/:id/feedback` with `{ "rating": "relevant" | "not_relevant" }` saves a job's relevance feedback; repeat with `DELETE /jobs/:id/feedback` to remove it. Feedback is stored for later evaluation and does not automatically train or change match scores.
 - `GET/PUT /profile` — read or replace structured profile JSON. Use fields such as `name`, `email`, `phone`, `location`, `skills`, `roles`, and `education`. Supply only verified facts.
 - `POST /profile/import-cv` — upload a PDF or DOCX (10 MB max). The API extracts likely fields and registers the original CV document; it does **not** overwrite the profile. Review and save the returned information from the profile editor. Image-only/scanned PDFs are not supported.
 - `GET/POST /documents` — manage document metadata; put files under `DOCUMENTS_DIR` and use paths contained within that directory.
@@ -28,13 +29,13 @@ The API is available on `http://localhost:3000`; `GET /health` is public. Set `A
 
 ## Optional semantic matching
 
-Keyword matching remains the default. For local embeddings, install [Ollama](https://ollama.com/), start it, and run `ollama pull nomic-embed-text`; keep `EMBEDDING_PROVIDER=ollama`.
+The supplied `.env.example` is configured for Gemini hybrid matching; add your Gemini API key before starting the backend. Without matching variables, the application defaults to keyword matching. For local embeddings instead, install [Ollama](https://ollama.com/), start it, and run `ollama pull nomic-embed-text`; set `EMBEDDING_PROVIDER=ollama`.
 
 For a hosted option, create a Gemini API key in [Google AI Studio](https://aistudio.google.com/apikey), then set `EMBEDDING_PROVIDER=gemini`, `GEMINI_API_KEY=...`, and `MATCHING_MODE=hybrid` in `.env`. The default model is `gemini-embedding-001`; `gemini-embedding-2` can also be selected. Google currently lists a free tier for its embedding endpoint, but quotas and availability can change. Check Google's current [pricing](https://ai.google.dev/gemini-api/docs/pricing) and [terms](https://ai.google.dev/gemini-api/terms) before enabling it. Google says free-tier content may be used to improve its products; structured profile facts (summary, skills, experience, education, preferences) are sent to generate embeddings. Do not enable the hosted provider unless you are comfortable with that data handling.
 
-`hybrid` combines semantic similarity (70%) with the keyword/location/seniority score (30%); `MATCHING_MODE=semantic` uses semantic similarity alone. If the selected provider is unavailable or missing its key, scoring falls back to keyword matching. The first rescore can take longer while embeddings are generated and cached. Defaults remain `MATCHING_MODE=keyword` and `EMBEDDING_PROVIDER=ollama`.
+`hybrid` normally combines semantic similarity (70%) with the keyword/location/seniority score (30%). If the profile contains skills but none appear as whole-word matches in a listing, the weights shift to 30% semantic and 70% explicit profile checks to reduce unrelated-role recommendations. `MATCHING_MODE=semantic` uses semantic similarity alone. If the selected provider is unavailable or missing its key, scoring falls back to keyword matching. The first rescore can take longer while embeddings are generated and cached. The application defaults remain `MATCHING_MODE=keyword` and `EMBEDDING_PROVIDER=ollama` when these variables are not configured.
 
-The collector runs on startup and every four hours. It currently includes only the Job Search Malawi source. Source HTML can change; inspect logs and check the jobs endpoint after startup.
+The collector runs on startup and every four hours. It currently includes Job Search Malawi, Ntchito Malawi, Careers Malawi, CareerAd Malawi, and Online Job Vacancies in Malawi. Malawijob.com returned HTTP 403 during source verification and is not scraped. Source HTML can change; inspect logs and check the jobs endpoint after startup. Aggregation is limited to public listing pages and excludes obvious tender, scholarship, grant, and training entries where the source markup permits.
 
 ## Database changes
 

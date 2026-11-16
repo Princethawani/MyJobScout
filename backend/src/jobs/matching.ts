@@ -10,10 +10,26 @@ function strings(value: unknown): string[] {
   return Array.isArray(value) ? value.filter((item): item is string => typeof item === 'string' && item.trim().length > 0) : [];
 }
 
+function containsWholeSkill(text: string, skill: string): boolean {
+  const escaped = skill.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/\s+/g, '\\s+');
+  return new RegExp(`(?<![\\p{L}\\p{N}])${escaped}(?![\\p{L}\\p{N}])`, 'iu').test(text);
+}
+
+export function combineHybridScore(semanticScore: number, keywordScore: number | null, hasDeclaredSkills: boolean, hasMatchedSkills: boolean) {
+  // When none of a user's declared skills occur in a listing, trust explicit
+  // profile checks more than broad semantic resemblance (e.g. a developer vs.
+  // a driver role). Preserve the usual blend when we have skill evidence.
+  const semanticWeight = hasDeclaredSkills && !hasMatchedSkills ? 0.3 : 0.7;
+  const fitScore = keywordScore === null
+    ? semanticScore
+    : Math.round(semanticScore * semanticWeight + keywordScore * (1 - semanticWeight));
+  return { fitScore, semanticWeight };
+}
+
 export function calculateJobMatch(job: MatchableJob, data: ProfileData) {
   const text = `${job.title} ${job.company ?? ''} ${job.description ?? ''}`.toLowerCase();
   const skills = strings(data.skills);
-  const matchedSkills = skills.filter((skill) => text.includes(skill.toLowerCase()));
+  const matchedSkills = skills.filter((skill) => containsWholeSkill(text, skill));
   const missingSkills = skills.filter((skill) => !matchedSkills.includes(skill));
   const preferredLocations = strings(data.preferredLocations);
   const locationMatched = preferredLocations.length > 0
@@ -121,11 +137,14 @@ export async function rescoreJobs(): Promise<void> {
     const semanticScore = similarity === null ? null : Math.round(Math.max(0, Math.min(1, similarity)) * 100);
     let fitScore = keyword.fitScore;
     let method = 'local-keyword';
+    let semanticWeight: number | null = null;
     if (semanticScore !== null && config.MATCHING_MODE === 'semantic') {
       fitScore = semanticScore;
       method = `${config.EMBEDDING_PROVIDER}-semantic`;
     } else if (semanticScore !== null && config.MATCHING_MODE === 'hybrid') {
-      fitScore = keyword.fitScore === null ? semanticScore : Math.round(semanticScore * 0.7 + keyword.fitScore * 0.3);
+      const blend = combineHybridScore(semanticScore, keyword.fitScore, keyword.scoreDetails.missingSkills.length > 0, keyword.scoreDetails.matchedSkills.length > 0);
+      fitScore = blend.fitScore;
+      semanticWeight = blend.semanticWeight;
       method = `${config.EMBEDDING_PROVIDER}-hybrid`;
     } else if (config.MATCHING_MODE !== 'keyword') {
       method = 'local-keyword-fallback';
@@ -134,7 +153,7 @@ export async function rescoreJobs(): Promise<void> {
       fitScore,
       embedding: jobVector,
       embeddingModel: jobVector ? embeddingModel : job.embeddingModel,
-      scoreDetails: { ...keyword.scoreDetails, method, keywordScore: keyword.fitScore, semanticScore },
+      scoreDetails: { ...keyword.scoreDetails, method, keywordScore: keyword.fitScore, semanticScore, semanticWeight },
       updatedAt: new Date(),
     }).where(eq(jobs.id, job.id));
   }

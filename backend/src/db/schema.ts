@@ -32,6 +32,12 @@ export const jobs = pgTable('jobs', {
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 }, (table) => ({ sourceUrlUnique: uniqueIndex('jobs_source_url_unique').on(table.sourceId, table.url) }));
 
+export const jobFeedback = pgTable('job_feedback', {
+  jobId: uuid('job_id').primaryKey().references(() => jobs.id, { onDelete: 'cascade' }),
+  rating: varchar('rating', { length: 20 }).notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
 export const profile = pgTable('profile', {
   id: uuid('id').defaultRandom().primaryKey(),
   data: jsonb('data').notNull().default({}),
@@ -73,6 +79,10 @@ export const letterVersions = pgTable('letter_versions', {
 export const jobsRelations = relations(jobs, ({ one, many }) => ({
   source: one(sources, { fields: [jobs.sourceId], references: [sources.id] }),
   applications: many(applications),
+  feedback: one(jobFeedback, { fields: [jobs.id], references: [jobFeedback.jobId] }),
+}));
+export const jobFeedbackRelations = relations(jobFeedback, ({ one }) => ({
+  job: one(jobs, { fields: [jobFeedback.jobId], references: [jobs.id] }),
 }));
 export const applicationsRelations = relations(applications, ({ one }) => ({
   job: one(jobs, { fields: [applications.jobId], references: [jobs.id] }),
